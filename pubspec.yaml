@@ -1,0 +1,54 @@
+name: recibo_to_pdf
+description: "Generador de recibos institucionales EPTA en PDF."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- Estado y navegación ---
+  flutter_riverpod: ^2.5.1      # Gestión de estado reactiva. La usamos porque
+                                  # separa la lógica (providers) de la UI (widgets),
+                                  # y facilita testear sin levantar pantallas.
+  go_router: ^14.2.0            # Navegación declarativa (Navigator 2.0). Nos deja
+                                  # definir rutas con nombre ("/form", "/history")
+                                  # y proteger rutas con un "redirect" (guard de login).
+
+  # --- Firebase ---
+  firebase_core: ^3.3.0
+  firebase_auth: ^5.1.0
+  cloud_firestore: ^5.2.0
+  firebase_storage: ^12.1.0
+
+  # --- Generación de PDF ---
+  pdf: ^3.11.1                  # Construye el documento PDF byte a byte.
+  printing: ^5.13.1             # Renderiza, previsualiza, comparte e imprime
+                                  # ese PDF — funciona igual en Android y en Web.
+
+  # --- Utilidades ---
+  path_provider: ^2.1.4         # Rutas del sistema de archivos (solo Android).
+  share_plus: ^10.0.0           # Compartir el PDF con otras apps (Android).
+  url_launcher: ^6.3.0          # Abrir la URL de un PDF guardado (historial).
+  intl: ^0.19.0                 # Formateo de fechas.
+
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  mocktail: ^1.0.3              # Crea "dobles" falsos de FirebaseAuth/Firestore/
+                                  # Storage para poder testear sin conexión real.
+
+flutter:
+  uses-material-design: true
+
+# ¿Por qué fijamos versiones con "^x.y.z" (caret) en vez de exactas?
+# El caret permite actualizaciones de parches y minor (que no deberían romper
+# nada según semver), pero bloquea majors. Es el balance recomendado por el
+# equipo de Flutter: evitas que una actualización mayor rompa el build de un
+# día para otro, sin congelar el proyecto en una versión vieja para siempre.
