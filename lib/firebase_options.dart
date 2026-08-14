@@ -50,7 +50,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBhyzWjYep2IFwrMYlZkuxpqCV07lUnPJ8',
+    apiKey: 'AIzaSyAIhMLmUMsrusfFkQtkTiWpZ1CEZ-EfsgU',
     appId: '1:572621530969:web:cfb9ef4735251b122b8e48',
     messagingSenderId: '572621530969',
     projectId: 'recibo-to-pdf',
@@ -60,7 +60,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDaB967GISpIxfDCyEmf_eFhBxRqUjkw74',
+    apiKey: 'AIzaSyBTxLdJnrFOvdOVDe6UlwKk0RMMUNAjXKI',
     appId: '1:572621530969:android:cfef15302c3f926f2b8e48',
     messagingSenderId: '572621530969',
     projectId: 'recibo-to-pdf',
