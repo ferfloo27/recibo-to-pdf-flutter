@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"recibo-to-pdf","appId":"1:572621530969:android:cfef15302c3f926f2b8e48","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"recibo-to-pdf","configurations":{"android":"1:572621530969:android:cfef15302c3f926f2b8e48","web":"1:572621530969:web:cfb9ef4735251b122b8e48"}}}}}}

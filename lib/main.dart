@@ -12,13 +12,24 @@
 // las pantallas reales.
 
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:printing/printing.dart';
 
+import 'firebase_options.dart';
 import 'services/pdf_service.dart';
 import 'models/recibo_data.dart';
 import 'ui/theme/app_theme.dart';
 
-void main() {
+// `main()` ahora es `async` porque Firebase.initializeApp() es una
+// operación asíncrona (se conecta al servidor de Firebase antes de poder
+// usar Auth/Firestore/Storage). `WidgetsFlutterBinding.ensureInitialized()`
+// es obligatorio ANTES de cualquier `await` en main() — le dice a Flutter
+// "prepara el motor nativo" antes de que le pidamos hacer cosas async.
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 

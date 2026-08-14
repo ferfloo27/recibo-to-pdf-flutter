@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "572621530969",
+    "project_id": "recibo-to-pdf",
+    "storage_bucket": "recibo-to-pdf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:572621530969:android:cfef15302c3f926f2b8e48",
+        "android_client_info": {
+          "package_name": "com.example.recibotopdf"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDaB967GISpIxfDCyEmf_eFhBxRqUjkw74"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

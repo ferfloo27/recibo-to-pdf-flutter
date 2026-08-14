@@ -1,0 +1,40 @@
+// firestore.rules
+//
+// Estas reglas se pegan en Firebase Console → Firestore Database → Reglas
+// (o se despliegan con `firebase deploy --only firestore:rules` si
+// prefieres hacerlo por CLI). NO van dentro de lib/, no son código Dart —
+// es un lenguaje propio de Firebase para describir permisos.
+//
+// La idea central: `request.auth.uid` es el ID del usuario que está
+// haciendo la petición (Firebase lo verifica automáticamente a partir del
+// token de sesión). Comparamos eso contra el campo `userId` que guardamos
+// en cada documento — si no coinciden, la operación se rechaza ANTES de
+// tocar la base de datos.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /recibos/{reciboId} {
+
+      // LECTURA: solo si el documento le pertenece al usuario autenticado.
+      // `resource.data` es el documento TAL COMO YA EXISTE en la base.
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.userId;
+
+      // CREACIÓN: solo si el documento que se está por crear tiene el
+      // userId del usuario autenticado (evita que alguien cree un recibo
+      // "a nombre de" otro usuario). `request.resource.data` es el
+      // documento NUEVO que se está intentando escribir.
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.userId;
+
+      // No permitimos update ni delete por ahora — un recibo institucional
+      // no debería editarse después de creado, es un principio de
+      // auditoría (si algo salió mal, se crea un recibo nuevo, no se
+      // "corrige" uno existente).
+      allow update, delete: if false;
+    }
+  }
+}
