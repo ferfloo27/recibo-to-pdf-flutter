@@ -12,6 +12,7 @@
 // las pantallas reales.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:printing/printing.dart';
 
@@ -20,17 +21,16 @@ import 'services/pdf_service.dart';
 import 'models/recibo_data.dart';
 import 'ui/theme/app_theme.dart';
 
-// `main()` ahora es `async` porque Firebase.initializeApp() es una
-// operación asíncrona (se conecta al servidor de Firebase antes de poder
-// usar Auth/Firestore/Storage). `WidgetsFlutterBinding.ensureInitialized()`
-// es obligatorio ANTES de cualquier `await` en main() — le dice a Flutter
-// "prepara el motor nativo" antes de que le pidamos hacer cosas async.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MyApp());
+  // ProviderScope es el widget raíz que "activa" Riverpod en toda la app.
+  // Cualquier provider que definimos (authServiceProvider, historialProvider,
+  // etc.) vive dentro de este scope — sin envolver la app acá, ref.watch()
+  // fallaría en cualquier pantalla.
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 /// El widget raíz de la app. Es un StatelessWidget porque este widget en sí
