@@ -39,6 +39,18 @@ class AuthService {
 
   Future<void> cerrarSesion() => _auth.signOut();
 
+  /// Envía un correo con un link para restablecer la contraseña. Firebase
+  /// maneja toda la lógica del lado de su servidor (generar el link,
+  /// mostrar su propia página de "nueva contraseña") — nosotros solo
+  /// pedimos que lo envíe.
+  Future<void> enviarCorreoRecuperacion(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (e) {
+      throw _mensajeDeError(e);
+    }
+  }
+
   /// Traduce los códigos de error de Firebase a mensajes legibles.
   /// Lanzamos un String simple (no una excepción custom) porque la UI solo
   /// necesita mostrar el texto en un SnackBar — no necesita más estructura.

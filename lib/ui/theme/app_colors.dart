@@ -10,7 +10,7 @@ class AppColors {
   AppColors._(); // Constructor privado: esta clase nunca se instancia,
   // solo se usa como "namespace" para agrupar constantes (AppColors.primary).
 
-  static const Color primary = Color(0xFF1B3A57); // Azul institucional FAB
+  static const Color primary = Color(0xFF1565C0); // Azul Material más brillante (ajustado según mockup de Stitch)
   static const Color secondary = Color(0xFF7A8B99);
   static const Color background = Color(0xFFF5F6F8);
   static const Color surface = Colors.white;
