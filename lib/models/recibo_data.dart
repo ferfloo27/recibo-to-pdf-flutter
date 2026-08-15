@@ -1,142 +1,156 @@
 // lib/models/recibo_data.dart
 //
-// ¿Por qué es INMUTABLE (todos los campos `final`)? Riverpod (y el estado
-// reactivo en general) funciona mejor cuando, en vez de "mutar" un objeto
-// existente, creamos uno nuevo cada vez que algo cambia. Eso hace que:
-//   1. Sea imposible que dos partes de la app modifiquen el mismo objeto
-//      "por atrás" sin que nadie se entere.
-//   2. Cada cambio de estado sea un objeto nuevo y comparable, lo que hace
-//      más fácil debuggear ("¿por qué cambió la pantalla? -> llegó este
-//      ReciboData nuevo").
-//
-// Por eso NO hay setters (`data.monto = 5`), sino `copyWith`, que devuelve
-// una copia con solo los campos indicados cambiados.
+// REESTRUCTURADO para ser genérico (no atado a la Fuerza Aérea/EPTA):
+//   - `institucion`: texto libre que reemplaza el encabezado fijo.
+//   - `nombreQuienEntrega` / `cargoQuienEntrega`: firma izquierda. El cargo
+//     es OPCIONAL (no toda persona que entrega tiene un puesto formal).
+//   - `nombreQuienRecibe` / `cargoQuienRecibe`: aparece en "Recibí de:" Y
+//     en la firma derecha — es la MISMA persona en los dos lugares, según
+//     lo que definimos.
+//   - `fecha` ahora es un DateTime real (antes eran 3 campos sueltos:
+//     día/mes/año) — se puede formatear de cualquier forma con `intl`, y
+//     se presta a un selector de fecha nativo en la UI.
+
+import 'package:intl/intl.dart';
 
 class ReciboData {
-  final String numeroRecibo; // Ej: "010/2024"
-  final double monto; // Monto en números (Bolivianos)
-  final String montoEnTexto; // Ej: "Cuarenta 00/100 Bolivianos"
-  final String recibiDe; // Quién entrega el dinero
-  final String concepto; // Motivo del pago
-  final int dia;
-  final String mes; // En texto: "Enero", "Febrero", ...
-  final int anio;
-  final String cajero; // Nombre del Cajero EPTA
-  final String comandante; // Nombre del Comandante / Cnl.
+  final String institucion;
+  final String numeroRecibo;
+  final DateTime fecha;
+  final double monto;
+  final String montoEnTexto;
+  final String concepto;
+  final String nombreQuienEntrega;
+  final String cargoQuienEntrega; // Puede quedar vacío — es opcional.
+  final String nombreQuienRecibe;
+  final String cargoQuienRecibe; // Puede quedar vacío — es opcional.
 
   const ReciboData({
+    required this.institucion,
     required this.numeroRecibo,
+    required this.fecha,
     required this.monto,
     required this.montoEnTexto,
-    required this.recibiDe,
     required this.concepto,
-    required this.dia,
-    required this.mes,
-    required this.anio,
-    required this.cajero,
-    required this.comandante,
+    required this.nombreQuienEntrega,
+    required this.cargoQuienEntrega,
+    required this.nombreQuienRecibe,
+    required this.cargoQuienRecibe,
   });
 
-  /// Estado inicial vacío, usado por el provider del formulario antes de
-  /// que el usuario escriba nada.
-  factory ReciboData.empty() => const ReciboData(
+  /// La fecha arranca en HOY (Requisito nuevo: precargar la fecha actual,
+  /// el usuario la puede cambiar si quiere). El resto arranca vacío, como
+  /// antes.
+  factory ReciboData.empty() => ReciboData(
+        institucion: '',
         numeroRecibo: '',
+        fecha: DateTime.now(),
         monto: 0,
         montoEnTexto: '',
-        recibiDe: '',
         concepto: '',
-        dia: 0,
-        mes: '',
-        anio: 0,
-        cajero: '',
-        comandante: '',
+        nombreQuienEntrega: '',
+        cargoQuienEntrega: '',
+        nombreQuienRecibe: '',
+        cargoQuienRecibe: '',
       );
 
-  /// Devuelve una copia de este ReciboData con los campos indicados
-  /// reemplazados. Los campos que no se pasan mantienen su valor actual.
-  /// Ej: `data.copyWith(monto: 40.0)` — todo igual, solo cambia el monto.
   ReciboData copyWith({
+    String? institucion,
     String? numeroRecibo,
+    DateTime? fecha,
     double? monto,
     String? montoEnTexto,
-    String? recibiDe,
     String? concepto,
-    int? dia,
-    String? mes,
-    int? anio,
-    String? cajero,
-    String? comandante,
+    String? nombreQuienEntrega,
+    String? cargoQuienEntrega,
+    String? nombreQuienRecibe,
+    String? cargoQuienRecibe,
   }) {
     return ReciboData(
+      institucion: institucion ?? this.institucion,
       numeroRecibo: numeroRecibo ?? this.numeroRecibo,
+      fecha: fecha ?? this.fecha,
       monto: monto ?? this.monto,
       montoEnTexto: montoEnTexto ?? this.montoEnTexto,
-      recibiDe: recibiDe ?? this.recibiDe,
       concepto: concepto ?? this.concepto,
-      dia: dia ?? this.dia,
-      mes: mes ?? this.mes,
-      anio: anio ?? this.anio,
-      cajero: cajero ?? this.cajero,
-      comandante: comandante ?? this.comandante,
+      nombreQuienEntrega: nombreQuienEntrega ?? this.nombreQuienEntrega,
+      cargoQuienEntrega: cargoQuienEntrega ?? this.cargoQuienEntrega,
+      nombreQuienRecibe: nombreQuienRecibe ?? this.nombreQuienRecibe,
+      cargoQuienRecibe: cargoQuienRecibe ?? this.cargoQuienRecibe,
     );
   }
 
-  /// Convierte el objeto a un Map plano — así es como Firestore guarda los
-  /// documentos (Firestore no entiende clases de Dart, solo mapas/JSON).
   Map<String, dynamic> toMap() {
     return {
+      'institucion': institucion,
       'numeroRecibo': numeroRecibo,
+      // Firestore no tiene un tipo "DateTime" propio — lo guardamos como
+      // milisegundos desde 1970 (un entero), y lo reconstruimos con
+      // DateTime.fromMillisecondsSinceEpoch al leerlo. Es el patrón
+      // estándar para fechas "de dominio" (la fecha DEL recibo, distinta
+      // de `creadoEn`, que sí usa el Timestamp del servidor).
+      'fecha': fecha.millisecondsSinceEpoch,
       'monto': monto,
       'montoEnTexto': montoEnTexto,
-      'recibiDe': recibiDe,
       'concepto': concepto,
-      'dia': dia,
-      'mes': mes,
-      'anio': anio,
-      'cajero': cajero,
-      'comandante': comandante,
+      'nombreQuienEntrega': nombreQuienEntrega,
+      'cargoQuienEntrega': cargoQuienEntrega,
+      'nombreQuienRecibe': nombreQuienRecibe,
+      'cargoQuienRecibe': cargoQuienRecibe,
     };
   }
 
-  /// El camino inverso: reconstruye un ReciboData a partir de lo que
-  /// devuelve Firestore. Usamos valores por defecto (`?? ''`, `?? 0`) por si
-  /// algún documento viejo no tiene un campo — así no explota la app.
   factory ReciboData.fromMap(Map<String, dynamic> map) {
+    final fechaMs = map['fecha'] as int?;
     return ReciboData(
+      institucion: map['institucion'] ?? '',
       numeroRecibo: map['numeroRecibo'] ?? '',
+      fecha: fechaMs != null
+          ? DateTime.fromMillisecondsSinceEpoch(fechaMs)
+          : DateTime.now(),
       monto: (map['monto'] ?? 0).toDouble(),
       montoEnTexto: map['montoEnTexto'] ?? '',
-      recibiDe: map['recibiDe'] ?? '',
       concepto: map['concepto'] ?? '',
-      dia: map['dia'] ?? 0,
-      mes: map['mes'] ?? '',
-      anio: map['anio'] ?? 0,
-      cajero: map['cajero'] ?? '',
-      comandante: map['comandante'] ?? '',
+      nombreQuienEntrega: map['nombreQuienEntrega'] ?? '',
+      cargoQuienEntrega: map['cargoQuienEntrega'] ?? '',
+      nombreQuienRecibe: map['nombreQuienRecibe'] ?? '',
+      cargoQuienRecibe: map['cargoQuienRecibe'] ?? '',
     );
   }
 
-  /// "Fecha" ya formateada como el recibo la necesita en el PDF:
-  /// "Cochabamba, 5 de Enero de 2026"
-  String get fechaFormateada => 'Cochabamba, $dia de $mes de $anio';
+  /// "Cochabamba, 5 de enero de 2026" — usamos DateFormat con locale
+  /// español (ya inicializado en main.dart) en vez de armar el string a
+  /// mano como antes.
+  String get fechaFormateada =>
+      'Cochabamba, ${DateFormat("d 'de' MMMM 'de' yyyy", 'es').format(fecha)}';
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is ReciboData &&
+        other.institucion == institucion &&
         other.numeroRecibo == numeroRecibo &&
+        other.fecha == fecha &&
         other.monto == monto &&
         other.montoEnTexto == montoEnTexto &&
-        other.recibiDe == recibiDe &&
         other.concepto == concepto &&
-        other.dia == dia &&
-        other.mes == mes &&
-        other.anio == anio &&
-        other.cajero == cajero &&
-        other.comandante == comandante;
+        other.nombreQuienEntrega == nombreQuienEntrega &&
+        other.cargoQuienEntrega == cargoQuienEntrega &&
+        other.nombreQuienRecibe == nombreQuienRecibe &&
+        other.cargoQuienRecibe == cargoQuienRecibe;
   }
 
   @override
-  int get hashCode => Object.hash(numeroRecibo, monto, montoEnTexto, recibiDe,
-      concepto, dia, mes, anio, cajero, comandante);
+  int get hashCode => Object.hash(
+        institucion,
+        numeroRecibo,
+        fecha,
+        monto,
+        montoEnTexto,
+        concepto,
+        nombreQuienEntrega,
+        cargoQuienEntrega,
+        nombreQuienRecibe,
+        cargoQuienRecibe,
+      );
 }

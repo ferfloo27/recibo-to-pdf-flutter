@@ -1,28 +1,18 @@
 // lib/services/pdf_service.dart
 //
-// ¿Cómo funciona el paquete `pdf`? Se parece mucho a construir widgets de
-// Flutter: en vez de Text/Column/Row de Flutter, usamos pw.Text/pw.Column/
-// pw.Row (el prefijo "pw" = "package:pdf/widgets"). La diferencia es que
-// esto NO se dibuja en pantalla, se "dibuja" dentro de un documento PDF.
-//
-// El flujo general siempre es:
-//   1. Crear un pw.Document()
-//   2. Agregarle una o más pw.Page con addPage()
-//   3. Pedirle los bytes finales con document.save()
-//
-// Esos bytes son los que luego usamos con el paquete `printing` para
-// mostrar la previsualización, compartir o guardar el archivo.
+// REESTRUCTURADO: el encabezado ya no es texto fijo de la Fuerza Aérea —
+// ahora viene del campo `institucion` que escribe el usuario. Las firmas
+// ya no dicen "CAJERO EPTA" / "COMANDANTE DE LA EPTA" — dicen el nombre y,
+// si lo cargaron, el cargo de cada persona (genérico para cualquier
+// institución).
 
 import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import '../../models/recibo_data.dart';
+import '../models/recibo_data.dart';
 
 class PdfService {
-  /// Construye el PDF del recibo y devuelve sus bytes en memoria.
-  /// No lo guarda en ningún lado todavía — eso lo hace el FirebaseService
-  /// más adelante, subiendo estos bytes a Storage.
   Future<Uint8List> generarReciboPdf(ReciboData data) async {
     final document = pw.Document();
 
@@ -37,10 +27,6 @@ class PdfService {
     return document.save();
   }
 
-  /// Todo el contenido visual del recibo, de arriba hacia abajo.
-  /// Lo separamos en un método aparte (en vez de meterlo todo dentro del
-  /// `build:` de arriba) porque así queda más fácil de leer: cada método
-  /// `_buildX` es una "sección" del recibo.
   pw.Widget _buildContenido(ReciboData data) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -49,23 +35,26 @@ class PdfService {
         pw.SizedBox(height: 24),
         _buildTitulo(data),
         pw.SizedBox(height: 20),
-        _buildRecibiDe(data),
+        _buildQuienRecibe(data),
         pw.SizedBox(height: 12),
         _buildLaSuma(data),
         pw.SizedBox(height: 12),
         _buildConcepto(data),
         pw.SizedBox(height: 30),
         _buildFecha(data),
-        pw.Spacer(), // Empuja las firmas hasta abajo de la página.
+        pw.Spacer(),
         _buildFirmas(data),
       ],
     );
   }
 
-  /// Encabezado institucional a la izquierda + caja del monto arriba a la
-  /// derecha. Usamos un pw.Row porque necesitamos DOS cosas alineadas en
-  /// extremos opuestos del mismo renglón horizontal.
+  /// El encabezado ahora es simplemente el texto de `institucion` tal cual
+  /// lo escribió el usuario — puede tener varias líneas (si tipeó saltos
+  /// de línea), por eso lo separamos con `.split('\n')` y armamos un
+  /// Text por línea, en vez de asumir 3 líneas fijas como antes.
   pw.Widget _buildEncabezadoConMonto(ReciboData data) {
+    final lineasInstitucion = data.institucion.split('\n');
+
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -73,23 +62,22 @@ class PdfService {
         pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text('FUERZA AÉREA BOLIVIANA',
-                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-            pw.Text('ESC. DE PERFEC. TÉCNICO AERONÁUTICO',
-                style: const pw.TextStyle(fontSize: 10)),
-            pw.Text('BOLIVIA', style: const pw.TextStyle(fontSize: 10)),
+            for (var i = 0; i < lineasInstitucion.length; i++)
+              pw.Text(
+                lineasInstitucion[i],
+                style: pw.TextStyle(
+                  fontSize: i == 0 ? 12 : 10,
+                  fontWeight: i == 0 ? pw.FontWeight.bold : pw.FontWeight.normal,
+                ),
+              ),
           ],
         ),
-        // La "caja" del monto: un pw.Container con `decoration` de borde,
-        // igual que un Container con BoxDecoration en Flutter normal.
         pw.Container(
           padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(width: 1),
-          ),
+          decoration: pw.BoxDecoration(border: pw.Border.all(width: 1)),
           child: pw.Column(
             children: [
-               pw.Text('Bs', style: pw.TextStyle(fontSize: 9)),
+              pw.Text('Bs', style: pw.TextStyle(fontSize: 9)),
               pw.Text(
                 data.monto.toStringAsFixed(2),
                 style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
@@ -101,45 +89,31 @@ class PdfService {
     );
   }
 
-  /// "RECIBO" centrado con espaciado de letras (letter-spacing), y el
-  /// número de recibo alineado a la derecha justo debajo.
-  ///
-  /// El paquete `pdf` no tiene una propiedad directa de "letterSpacing"
-  /// como Flutter. El truco estándar es insertar espacios entre cada letra
-  /// del texto (R E C I B O) — funciona bien para un título corto como este.
   pw.Widget _buildTitulo(ReciboData data) {
     return pw.Column(
       children: [
         pw.Center(
-          child: pw.Text(
-            'R E C I B O',
-            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
-          ),
+          child: pw.Text('R E C I B O',
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
         ),
         pw.Align(
           alignment: pw.Alignment.centerRight,
-          child: pw.Text('N° ${data.numeroRecibo}',
-              style: const pw.TextStyle(fontSize: 11)),
+          child: pw.Text('N° ${data.numeroRecibo}', style: const pw.TextStyle(fontSize: 11)),
         ),
       ],
     );
   }
 
-  /// Línea "Recibí de: ..." con puntos suspensivos hasta el borde.
-  /// Reutilizamos _buildLineaConPuntos para no repetir el mismo patrón
-  /// de layout dos veces (acá y en "La suma de").
-  pw.Widget _buildRecibiDe(ReciboData data) {
-    return _buildLineaConPuntos('Recibí de:', data.recibiDe);
+  /// "Recibí de: [nombreQuienRecibe]" — usa el campo fusionado, como
+  /// definimos: la misma persona que después firma a la derecha.
+  pw.Widget _buildQuienRecibe(ReciboData data) {
+    return _buildLineaConPuntos('Recibí de:', data.nombreQuienRecibe);
   }
 
   pw.Widget _buildLaSuma(ReciboData data) {
     return _buildLineaConPuntos('La suma de:', data.montoEnTexto);
   }
 
-  /// Genera una línea tipo "Etiqueta: ..........texto..........."
-  /// usando un pw.Row con un Expanded en el medio para que los puntos
-  /// rellenen automáticamente el espacio disponible, sin importar cuán
-  /// largo sea el texto de la etiqueta o el valor.
   pw.Widget _buildLineaConPuntos(String etiqueta, String valor) {
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -148,9 +122,7 @@ class PdfService {
         pw.SizedBox(width: 6),
         pw.Expanded(
           child: pw.Text(
-            ' $valor ${'.' * 60}', // Rellenamos con puntos; al ser texto
-            // dentro de un Expanded con overflow, el pdf lo recorta si no
-            // entra, así que no se desborda de la página.
+            ' $valor ${'.' * 60}',
             maxLines: 1,
             overflow: pw.TextOverflow.clip,
             style: const pw.TextStyle(fontSize: 11),
@@ -160,13 +132,11 @@ class PdfService {
     );
   }
 
-  /// Campo de concepto: le damos más espacio vertical porque puede ser
-  /// texto largo (es el único campo "libre" del formulario).
   pw.Widget _buildConcepto(ReciboData data) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-         pw.Text('Concepto:', style: pw.TextStyle(fontSize: 11)),
+        pw.Text('Concepto:', style: pw.TextStyle(fontSize: 11)),
         pw.SizedBox(height: 6),
         pw.Container(
           width: double.infinity,
@@ -184,23 +154,37 @@ class PdfService {
     );
   }
 
-  /// Las dos columnas de firma. Usamos un pw.Row con dos Expanded para que
-  /// ocupen el mismo ancho cada una, sin importar el largo de los nombres.
   pw.Widget _buildFirmas(ReciboData data) {
     return pw.Row(
       children: [
-        pw.Expanded(child: _buildBloqueFirma('ENTREGUE CONFORME', data.cajero, 'CAJERO EPTA')),
+        pw.Expanded(
+          child: _buildBloqueFirma(
+            etiquetaSuperior: 'ENTREGUE CONFORME',
+            nombre: data.nombreQuienEntrega,
+            cargo: data.cargoQuienEntrega,
+          ),
+        ),
         pw.SizedBox(width: 20),
         pw.Expanded(
-            child: _buildBloqueFirma(
-                'RECIBÍ CONFORME', data.comandante, 'COMANDANTE DE LA EPTA.')),
+          child: _buildBloqueFirma(
+            etiquetaSuperior: 'RECIBÍ CONFORME',
+            nombre: data.nombreQuienRecibe,
+            cargo: data.cargoQuienRecibe,
+          ),
+        ),
       ],
     );
   }
 
-  /// Un bloque de firma individual: línea para firmar, nombre y cargo.
-  /// pw.Divider dibuja la "línea" sobre la que se firmaría a mano.
-  pw.Widget _buildBloqueFirma(String etiquetaSuperior, String nombre, String cargo) {
+  /// El cargo ahora es OPCIONAL: si vino vacío, simplemente no dibujamos
+  /// esa línea (en vez de mostrar un espacio en blanco raro). El `if`
+  /// dentro de la lista de children — igual que hicimos en Flutter normal —
+  /// también es válido acá con los widgets `pw`.
+  pw.Widget _buildBloqueFirma({
+    required String etiquetaSuperior,
+    required String nombre,
+    required String cargo,
+  }) {
     return pw.Column(
       children: [
         pw.Text(etiquetaSuperior,
@@ -208,7 +192,8 @@ class PdfService {
         pw.SizedBox(height: 30),
         pw.Divider(thickness: 0.5),
         pw.Text(nombre, style: const pw.TextStyle(fontSize: 10)),
-        pw.Text(cargo, style: const pw.TextStyle(fontSize: 9)),
+        if (cargo.trim().isNotEmpty)
+          pw.Text(cargo, style: const pw.TextStyle(fontSize: 9)),
       ],
     );
   }
