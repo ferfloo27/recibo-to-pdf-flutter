@@ -118,11 +118,12 @@ class ReciboData {
     );
   }
 
-  /// "Cochabamba, 5 de enero de 2026" — usamos DateFormat con locale
-  /// español (ya inicializado en main.dart) en vez de armar el string a
-  /// mano como antes.
+  /// "Cochabamba, 5 de enero de 2026" — para el cuerpo del PDF/vista previa.
   String get fechaFormateada =>
       'Cochabamba, ${DateFormat("d 'de' MMMM 'de' yyyy", 'es').format(fecha)}';
+
+  /// "5 enero 2026" — versión corta, sin ciudad, para el badge de fecha.
+  String get fechaCorta => DateFormat("d MMMM yyyy", 'es').format(fecha);
 
   @override
   bool operator ==(Object other) {

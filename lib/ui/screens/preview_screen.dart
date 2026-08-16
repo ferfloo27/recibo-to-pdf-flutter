@@ -164,7 +164,6 @@ class _TarjetaRecibo extends StatelessWidget {
     final montoFormateado =
         NumberFormat.currency(locale: 'es_BO', symbol: 'Bs ', decimalDigits: 2)
             .format(data.monto);
-    final fechaCorta = DateFormat("d MMMM yyyy", 'es').format(data.fecha);
 
     return Card(
       child: Padding(
@@ -209,7 +208,7 @@ class _TarjetaRecibo extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text('Fecha: $fechaCorta', style: const TextStyle(fontSize: 11)),
+                    Text('Fecha: ${data.fechaCorta}', style: const TextStyle(fontSize: 11)),
                   ],
                 ),
               ],
