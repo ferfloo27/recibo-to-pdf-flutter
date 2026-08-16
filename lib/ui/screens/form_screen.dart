@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import '../../providers/recibo_form_provider.dart';
 import '../../providers/service_providers.dart';
 import '../../providers/pdf_preview_provider.dart';
+import '../../services/numero_a_texto_service.dart';
 
 class FormScreen extends ConsumerStatefulWidget {
   const FormScreen({super.key});
@@ -187,21 +188,38 @@ class _FormScreenState extends ConsumerState<FormScreen> {
                   },
                   onChanged: (v) {
                     final parsed = double.tryParse(v);
-                    if (parsed != null) {
-                      ref.read(reciboFormProvider.notifier).actualizarMonto(parsed);
-                    }
+                    if (parsed == null) return;
+
+                    ref.read(reciboFormProvider.notifier).actualizarMonto(parsed);
+
+                    // Cada vez que cambia el número, recalculamos el texto
+                    // en letras y actualizamos el OTRO controller a mano
+                    // (con .text =, no con setState) — como este campo ya
+                    // no lo edita el usuario, no hace falta reconstruir
+                    // toda la pantalla, solo actualizar lo que se ve en
+                    // ese TextFormField puntual.
+                    final textoGenerado = NumeroATextoService.convertir(parsed);
+                    _montoTextoController.text = textoGenerado;
+                    ref
+                        .read(reciboFormProvider.notifier)
+                        .actualizarMontoEnTexto(textoGenerado);
                   },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _montoTextoController,
+                  // readOnly (no `enabled: false`): la diferencia es que
+                  // `enabled: false` además lo pinta gris y lo saca de la
+                  // validación del Form. Queremos que SIGA participando
+                  // del validator (por si el usuario intenta enviar sin
+                  // haber puesto un monto todavía), solo que no se pueda
+                  // tipear directo.
+                  readOnly: true,
                   decoration: const InputDecoration(
-                    labelText: 'Monto en texto',
-                    hintText: 'Ej. Cuarenta 00/100 Bolivianos',
+                    labelText: 'Monto en texto (automático)',
+                    hintText: 'Se completa solo al ingresar el monto',
                   ),
                   validator: _requerido,
-                  onChanged: (v) =>
-                      ref.read(reciboFormProvider.notifier).actualizarMontoEnTexto(v),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
