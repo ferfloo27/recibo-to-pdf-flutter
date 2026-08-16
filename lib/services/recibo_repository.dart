@@ -78,10 +78,76 @@ class ReciboRepository {
       id: doc.id,
       datos: ReciboData.fromMap(map),
       storageUrl: map['storageUrl'] ?? '',
-      // Si `creadoEn` todavía no llegó del servidor (puede pasar por un
-      // instante justo después de escribir, por el modo offline-first de
-      // Firestore), usamos la hora local como respaldo temporal.
       creadoEn: timestamp?.toDate() ?? DateTime.now(),
     );
+  }
+
+  /// Mira TODOS los números de recibo que ya tiene este usuario, saca el
+  /// número más alto que encuentre (buscando dígitos dentro del texto,
+  /// porque el campo es libre — puede ser "0007", "REC-2024-007", etc.) y
+  /// sugiere el siguiente, con el mismo relleno de ceros a la izquierda.
+  ///
+  /// Como `numeroRecibo` es texto libre (no un contador real en la base),
+  /// esto es una SUGERENCIA basada en lo que ya existe — no una garantía
+  /// matemática de que sea único (por eso además tenemos
+  /// `existeNumeroRecibo`, que si valida de verdad antes de guardar).
+  Future<String> sugerirSiguienteNumero(String userId) async {
+    final snapshot =
+        await _firestore.collection('recibos').where('userId', isEqualTo: userId).get();
+
+    var maximo = 0;
+    var digitosDelMaximo = 4; // Por defecto, si no hay ningún recibo previo.
+
+    for (final doc in snapshot.docs) {
+      final numero = doc.data()['numeroRecibo'] as String? ?? '';
+      // Busca TODAS las secuencias de dígitos dentro del texto y se queda
+      // con la ÚLTIMA (ej. en "REC-2024-007" nos interesa el "007", no el
+      // "2024") — es la parte que normalmente actúa como "correlativo".
+      final coincidencias = RegExp(r'\d+').allMatches(numero).toList();
+      if (coincidencias.isEmpty) continue;
+
+      final texto = coincidencias.last.group(0)!;
+      final valor = int.tryParse(texto) ?? 0;
+      if (valor > maximo) {
+        maximo = valor;
+        digitosDelMaximo = texto.length;
+      }
+    }
+
+    return (maximo + 1).toString().padLeft(digitosDelMaximo, '0');
+  }
+
+  /// Verificación real de duplicados. OJO: no compara el texto tal cual
+  /// (eso fallaba con "002" vs "2" — mismo número, texto distinto) — en
+  /// vez de eso, NORMALIZA cada número antes de comparar: si es puramente
+  /// numérico, le sacamos los ceros a la izquierda (parseándolo como int);
+  /// si tiene letras/guiones (ej. "REC-2024-007"), comparamos el texto tal
+  /// cual, en minúsculas.
+  ///
+  /// Como esta normalización no se puede hacer del lado de Firestore (la
+  /// base no sabe qué es "el mismo número" para nosotros), traemos TODOS
+  /// los recibos del usuario y comparamos acá, en Dart. Para la cantidad
+  /// de recibos que maneja una persona (decenas, no miles), esto es
+  /// perfectamente rápido.
+  Future<bool> existeNumeroRecibo(String userId, String numeroRecibo) async {
+    final snapshot =
+        await _firestore.collection('recibos').where('userId', isEqualTo: userId).get();
+
+    final buscado = _normalizarNumero(numeroRecibo);
+
+    return snapshot.docs.any((doc) {
+      final existente = doc.data()['numeroRecibo'] as String? ?? '';
+      return _normalizarNumero(existente) == buscado;
+    });
+  }
+
+  String _normalizarNumero(String numero) {
+    final limpio = numero.trim();
+    if (RegExp(r'^\d+$').hasMatch(limpio)) {
+      // "002" -> parseamos a 2 -> volvemos a texto -> "2". Así "002",
+      // "02" y "2" quedan todos como "2" al comparar.
+      return int.parse(limpio).toString();
+    }
+    return limpio.toLowerCase();
   }
 }

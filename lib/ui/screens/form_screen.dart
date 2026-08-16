@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import '../../providers/recibo_form_provider.dart';
 import '../../providers/service_providers.dart';
 import '../../providers/pdf_preview_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/numero_a_texto_service.dart';
 
 class FormScreen extends ConsumerStatefulWidget {
@@ -39,9 +40,6 @@ class _FormScreenState extends ConsumerState<FormScreen> {
   @override
   void initState() {
     super.initState();
-    // La fecha ya viene precargada con "hoy" desde ReciboData.empty(), pero
-    // los demás controllers los sincronizamos por si el usuario vuelve
-    // desde PreviewScreen con datos ya cargados (Requisito 6.4).
     final data = ref.read(reciboFormProvider);
     _institucionController.text = data.institucion;
     _numeroReciboController.text = data.numeroRecibo;
@@ -52,6 +50,26 @@ class _FormScreenState extends ConsumerState<FormScreen> {
     _cargoEntregaController.text = data.cargoQuienEntrega;
     _nombreRecibeController.text = data.nombreQuienRecibe;
     _cargoRecibeController.text = data.cargoQuienRecibe;
+
+    // Solo sugerimos un número si el campo está VACÍO — si el usuario
+    // volvió desde PreviewScreen con un número ya escrito, no se lo
+    // pisamos (Requisito 6.4: conservar los datos del formulario).
+    if (data.numeroRecibo.isEmpty) {
+      _sugerirNumeroRecibo();
+    }
+  }
+
+  Future<void> _sugerirNumeroRecibo() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+
+    final sugerencia = await ref.read(reciboRepositoryProvider).sugerirSiguienteNumero(userId);
+
+    // `mounted` de nuevo: para cuando esta consulta a Firestore termine,
+    // el usuario ya podría haberse ido de esta pantalla.
+    if (!mounted) return;
+    _numeroReciboController.text = sugerencia;
+    ref.read(reciboFormProvider.notifier).actualizarNumeroRecibo(sugerencia);
   }
 
   @override
@@ -91,6 +109,29 @@ class _FormScreenState extends ConsumerState<FormScreen> {
     setState(() => _generando = true);
     try {
       final data = ref.read(reciboFormProvider);
+      final userId = ref.read(currentUserIdProvider);
+
+      // Verificación REAL de duplicados (la sugerencia automática es solo
+      // eso, una sugerencia — el usuario puede haberla editado a mano, o
+      // haber creado otro recibo en otra pestaña mientras tanto). Se
+      // chequea justo antes de generar, no antes: así siempre validamos
+      // contra el estado más actual de Firestore.
+      if (userId != null) {
+        final yaExiste = await ref
+            .read(reciboRepositoryProvider)
+            .existeNumeroRecibo(userId, data.numeroRecibo);
+        if (yaExiste) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Ya existe un recibo con el número "${data.numeroRecibo}"'),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
       final pdfService = ref.read(pdfServiceProvider);
       final bytes = await pdfService.generarReciboPdf(data);
 
@@ -140,14 +181,11 @@ class _FormScreenState extends ConsumerState<FormScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _numeroReciboController,
+                        readOnly: true, // Requisito 6.3: el usuario no puede tipearlo
                         decoration: const InputDecoration(
-                          labelText: 'Número de Recibo',
-                          hintText: 'Ej. 0001',
+                          labelText: 'Número de Recibo'
                         ),
                         validator: _requerido,
-                        onChanged: (v) => ref
-                            .read(reciboFormProvider.notifier)
-                            .actualizarNumeroRecibo(v),
                       ),
                     ),
                     const SizedBox(width: 12),
