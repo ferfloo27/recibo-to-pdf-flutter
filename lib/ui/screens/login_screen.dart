@@ -209,9 +209,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     setState(() => _passwordVisible = !_passwordVisible),
                               ),
                             ),
+                            // El validador es DISTINTO según el modo:
+                            // - Registro: exigimos reglas más fuertes (8+
+                            //   caracteres, letra Y número) para las
+                            //   cuentas NUEVAS de acá en adelante.
+                            // - Login: dejamos el mínimo de 6 que exige
+                            //   Firebase — si lo subimos acá también,
+                            //   cuentas viejas con contraseñas de 6-7
+                            //   caracteres quedarían sin poder loguearse
+                            //   nunca más, lo cual sería un desastre.
                             validator: (value) {
-                              if (value == null || value.length < 6) {
-                                return 'La contraseña debe tener al menos 6 caracteres';
+                              if (value == null || value.isEmpty) {
+                                return 'Ingresa tu contraseña';
+                              }
+                              if (!_modoRegistro) {
+                                return value.length < 6
+                                    ? 'La contraseña debe tener al menos 6 caracteres'
+                                    : null;
+                              }
+                              if (value.length < 8) {
+                                return 'Debe tener al menos 8 caracteres';
+                              }
+                              if (!RegExp(r'[A-Za-z]').hasMatch(value) ||
+                                  !RegExp(r'[0-9]').hasMatch(value)) {
+                                return 'Debe incluir al menos una letra y un número';
                               }
                               return null;
                             },
@@ -301,9 +322,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 }
 
 /// El toggle tipo "pastilla" del mockup (Iniciar Sesión / Registrarse).
-/// Lo separamos en su propio widget porque es puramente visual y no
-/// depende de nada de Firebase ni Riverpod — recibe el estado actual y un
-/// callback, como cualquier widget "tonto" reutilizable.
+/// A diferencia del primer intento, acá hay UNA sola "píldora" blanca que
+/// se desliza de un lado al otro (con AnimatedAlign, dentro de un Stack) —
+/// los textos arriba solo cambian de color, no se animan como cajas
+/// separadas. Así, visualmente, solo se mueve UNA cosa, hacia donde
+/// tocaste, en vez de que ambos lados "reaccionen" a la vez.
 class _ToggleLoginRegistro extends StatelessWidget {
   final bool modoRegistro;
   final bool habilitado;
@@ -320,35 +343,71 @@ class _ToggleLoginRegistro extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
+      height: 44,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _segmento(
-              context,
-              texto: 'Iniciar Sesión',
-              seleccionado: !modoRegistro,
-              onTap: () => onChanged(false),
-            ),
-          ),
-          Expanded(
-            child: _segmento(
-              context,
-              texto: 'Registrarse',
-              seleccionado: modoRegistro,
-              onTap: () => onChanged(true),
-            ),
-          ),
-        ],
+      // LayoutBuilder nos da el ancho disponible real (constraints.maxWidth)
+      // para poder calcular que la píldora ocupe exactamente la mitad.
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final anchoPildora = constraints.maxWidth / 2;
+
+          return Stack(
+            children: [
+              // La ÚNICA pieza que se anima: se desliza a la izquierda o
+              // a la derecha según el modo. AnimatedAlign anima la
+              // POSICIÓN, no propiedades de color en dos widgets distintos.
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                alignment: modoRegistro ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: anchoPildora,
+                  height: double.infinity,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Los textos van ENCIMA de la píldora (por eso están después
+              // en el Stack), sin animación propia — solo cambian de color
+              // instantáneamente según cuál esté seleccionado.
+              Row(
+                children: [
+                  Expanded(
+                    child: _textoSegmento(
+                      context,
+                      texto: 'Iniciar Sesión',
+                      seleccionado: !modoRegistro,
+                      onTap: () => onChanged(false),
+                    ),
+                  ),
+                  Expanded(
+                    child: _textoSegmento(
+                      context,
+                      texto: 'Registrarse',
+                      seleccionado: modoRegistro,
+                      onTap: () => onChanged(true),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _segmento(
+  Widget _textoSegmento(
     BuildContext context, {
     required String texto,
     required bool seleccionado,
@@ -356,24 +415,14 @@ class _ToggleLoginRegistro extends StatelessWidget {
   }) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // AnimatedContainer anima solo el CAMBIO de color/forma cuando
-    // `seleccionado` cambia — sin esto, el toggle "saltaría" de golpe en
-    // vez de deslizarse suavemente.
     return GestureDetector(
       onTap: habilitado ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: seleccionado ? colorScheme.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: seleccionado
-              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]
-              : null,
-        ),
+      behavior: HitTestBehavior.opaque, // El área completa es "tocable",
+      // no solo donde hay texto — si no, tocar el espacio vacío alrededor
+      // de la palabra no haría nada.
+      child: Center(
         child: Text(
           texto,
-          textAlign: TextAlign.center,
           style: TextStyle(
             color: seleccionado ? colorScheme.primary : colorScheme.onSurfaceVariant,
             fontWeight: seleccionado ? FontWeight.bold : FontWeight.normal,

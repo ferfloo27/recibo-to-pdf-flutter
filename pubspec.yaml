@@ -1,5 +1,5 @@
 name: recibo_to_pdf
-description: "Generador de recibos institucionales EPTA en PDF."
+description: "Generador de recibos en PDF."
 publish_to: 'none'
 version: 0.1.0
 
@@ -23,6 +23,9 @@ dependencies:
   firebase_auth: ^5.1.0
   cloud_firestore: ^5.2.0
   firebase_storage: ^12.1.0
+  firebase_app_check: ^0.3.1     # Verifica que las peticiones a Firebase
+                                   # vengan realmente de esta app, no de un
+                                   # script/bot que copió las API keys.
 
   # --- Generación de PDF ---
   pdf: ^3.11.1                  # Construye el documento PDF byte a byte.

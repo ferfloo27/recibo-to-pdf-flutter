@@ -24,6 +24,9 @@ class AuthService {
   Future<void> registrar({required String email, required String password}) async {
     try {
       await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      // Apenas se crea la cuenta, disparamos el correo de verificación
+      // automáticamente — el usuario no tiene que pedirlo, ya le llega.
+      await _auth.currentUser?.sendEmailVerification();
     } on FirebaseAuthException catch (e) {
       throw _mensajeDeError(e);
     }
@@ -38,6 +41,20 @@ class AuthService {
   }
 
   Future<void> cerrarSesion() => _auth.signOut();
+
+    /// Por si el usuario borró el primer correo sin querer, o no le llegó
+  /// a tiempo — le permite pedir que se lo reenvíen.
+  Future<void> reenviarVerificacion() async {
+    await _auth.currentUser?.sendEmailVerification();
+  }
+ 
+  /// El objeto `User` que tenemos en memoria queda "congelado" en el
+  /// momento en que se creó — si el usuario verifica su correo en OTRA
+  /// pestaña/dispositivo, nuestra copia local no se entera sola. `reload()`
+  /// le pide a Firebase el estado más actual y lo actualiza acá.
+  Future<void> refrescarUsuario() async {
+    await _auth.currentUser?.reload();
+  }
 
   /// Envía un correo con un link para restablecer la contraseña. Firebase
   /// maneja toda la lógica del lado de su servidor (generar el link,

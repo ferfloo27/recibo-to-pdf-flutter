@@ -1,21 +1,15 @@
 // lib/providers/router_provider.dart
 //
-// El corazón de la navegación protegida está en `redirect:`. go_router
-// llama a esta función ANTES de mostrar cualquier pantalla, y le
-// preguntamos: "¿a dónde debería ir realmente el usuario?". Devolver
-// `null` significa "a ningún lado, deja que vaya a donde iba".
-//
-// Como este provider hace `ref.watch(authStateChangesProvider)`, cada vez
-// que cambia la sesión (login/logout), Riverpod reconstruye el GoRouter
-// completo con la nueva lógica de redirect — así, el simple hecho de
-// loguearte dispara automáticamente la navegación a FormScreen, sin que
-// LoginScreen tenga que llamar a un `context.go(...)` manualmente.
+// ACTUALIZADO: ahora hay TRES estados posibles, no dos — sin sesión, con
+// sesión pero SIN verificar el correo, y con sesión Y verificado. El
+// `redirect` de abajo maneja los tres.
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'auth_provider.dart';
 import '../ui/screens/login_screen.dart';
+import '../ui/screens/verify_email_screen.dart';
 import '../ui/screens/form_screen.dart';
 import '../ui/screens/preview_screen.dart';
 import '../ui/screens/history_screen.dart';
@@ -27,36 +21,35 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/form',
     redirect: (context, state) {
-      // `authState.value` es null mientras el stream todavía no emitió su
-      // primer evento (arranque de la app) O cuando no hay usuario
-      // logueado — tratamos ambos casos igual: "no hay sesión confirmada
-      // todavía, mándalo a login".
-      final haySesion = authState.value != null;
+      final usuario = authState.value;
+      final haySesion = usuario != null;
+      final correoVerificado = usuario?.emailVerified ?? false;
+
       final vaHaciaLogin = state.matchedLocation == '/login';
+      final vaHaciaVerificar = state.matchedLocation == '/verify-email';
 
       if (!haySesion) {
-        // Sin sesión: solo se permite estar en /login. Cualquier otra
-        // ruta redirige ahí (Requisito 6.2).
         return vaHaciaLogin ? null : '/login';
       }
 
-      // Con sesión: si intenta quedarse en /login (ya no tiene sentido,
-      // ya está logueado), lo mandamos al formulario.
-      if (vaHaciaLogin) return '/form';
+      if (!correoVerificado) {
+        // Con sesión pero SIN verificar: solo se permite estar en
+        // /verify-email. Ni siquiera /login tiene sentido acá (ya está
+        // logueado), así que también redirige.
+        return vaHaciaVerificar ? null : '/verify-email';
+      }
 
-      return null; // Cualquier otro caso: no redirigir, dejar pasar.
+      // Con sesión Y verificado: si intenta quedarse en /login o
+      // /verify-email (ya no tienen sentido), lo mandamos al formulario.
+      if (vaHaciaLogin || vaHaciaVerificar) return '/form';
+
+      return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-
-      // PreviewScreen vive FUERA del shell (sin bottom nav) porque es un
-      // paso intermedio del flujo de "crear un recibo", no una sección
-      // principal de la app a la que quieras volver directo.
+      GoRoute(
+          path: '/verify-email', builder: (context, state) => const VerifyEmailScreen()),
       GoRoute(path: '/preview', builder: (context, state) => const PreviewScreen()),
-
-      // StatefulShellRoute.indexedStack mantiene el ESTADO de cada pestaña
-      // vivo aunque cambies de una a otra (por ejemplo, si scrolleaste el
-      // historial y volvés, sigue en la misma posición del scroll).
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),

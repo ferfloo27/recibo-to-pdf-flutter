@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'firebase_options.dart';
@@ -20,6 +21,16 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+  // App Check verifica —por debajo, sin que la UI se entere— que cada
+  // petición a Firestore/Storage/Auth venga de ESTA app compilada, no de
+  // un script que copió las API keys y las usa directo contra el backend.
+  // Cada plataforma usa un "proveedor" distinto:
+  //   - Web: reCAPTCHA v3 (invisible, no le aparece ningún captcha al usuario)
+  //   - Android: Play Integrity (verifica la firma de la app instalada)
+  await FirebaseAppCheck.instance.activate(
+    webProvider: ReCaptchaV3Provider('6Lc5-YwtAAAAAO6L0k5Cyn4H89Xv8Q3DNQ1z54Xx'),
+    androidProvider: AndroidProvider.playIntegrity,
   );
   await initializeDateFormatting('es');
   runApp(const ProviderScope(child: MyApp()));
